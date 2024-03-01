@@ -90,6 +90,7 @@ class SmartTable(QtWidgets.QWidget):
         self.table_name: str = f'Table_{self._table_id}'
         self.summary_columns: list[smrt_summary_widget.Attribute] = []
         self.table_flags: smrt_consts.SmartTableFlags = smrt_consts.SmartTableFlags.NO_FLAG
+        self.col_value_attrs: dict[str, smrt_consts.SmartValueAttributes] = kwargs.get('col_value_attrs', None) or {}
         self.editors: dict[str, QtWidgets.QStyledItemDelegate] = {}
         self.current_view: smrt_tbl_view.SmartTableView = None
         self.default_view: smrt_tbl_view.SmartTableView = None
@@ -157,6 +158,7 @@ class SmartTable(QtWidgets.QWidget):
         self.table_model = smrt_data_model.SmartDataModel(
             smrt_df=smrt_df,
             editable_cols=list(self.editors.keys()),
+            col_value_attrs=self.col_value_attrs,
             parent=self
         )
         self.proxy_model = smrt_proxy_model.SmartProxyModel(parent=self)
@@ -208,6 +210,14 @@ class SmartTable(QtWidgets.QWidget):
         self.proxy_model.signal_filter_changed.connect(self.draw_column_icons)
         self.proxy_model.signal_sort_changed.connect(self.draw_column_icons)
         self.proxy_model.signal_hidden_columns_changed.connect(self.draw_column_icons)
+        self.table_view.doubleClicked.connect(self.on_cell_double_clicked)
+        self.table_model.dataChanged.connect(self.update_summary_totals)
+        self.table_model.dataChanged.connect(self.update_summary_selected)
+        self.table_model.dataChanged.connect(self.update_filter_totals)
+        self.table_model.rowsRemoved.connect(self.update_summary_totals)
+        self.table_model.rowsRemoved.connect(self.update_summary_selected)
+        self.table_model.rowsRemoved.connect(self.update_filter_totals)
+
     @property
     def refresh_dt(self) -> datetime.datetime:
         return self.__smrt_df.refresh_dt
@@ -230,7 +240,10 @@ class SmartTable(QtWidgets.QWidget):
         self.__smrt_df = new_smrt_df
         self.proxy_model.clear_sort()
         self.proxy_model.clear_filters()
+        self.proxy_model.beginResetModel()
         self.table_model.set_smrt_df(new_smrt_df)
+        self.proxy_model.on_model_reset()
+        self.proxy_model.endResetModel()
         self.refresh_dt = new_smrt_df.refresh_dt
         self.update_summary_totals()
 
@@ -389,6 +402,9 @@ class SmartTable(QtWidgets.QWidget):
             df_idx = self.smrt_df.data_df.iloc[model_idx.row()].name
             self.selected_idxs.append(df_idx)
         self.update_summary_selected()
+
+    def get_value_at_idx_and_col(self, idx: typing.Any, col_name: str):
+        return self.smrt_df.data_df.loc[idx, col_name]
 
     def update_summary_selected(self):
         if not self.summary_columns:
@@ -779,8 +795,8 @@ class SmartTable(QtWidgets.QWidget):
         filt_height = self.filter_dialog.height()
         header_x = self.table_view.horizontalHeader().mapToGlobal(QtCore.QPoint(0, 0)).x()
         header_y = self.table_view.horizontalHeader().mapToGlobal(QtCore.QPoint(0, 0)).y()
-        x_pos = header_x + self.table_view.horizontalHeader().sectionViewportPosition(col_num)
-        y_pos = header_y + self.table_view.horizontalHeader().geometry().y() + self.table_view.horizontalHeader().height()
+        x_pos = header_x + self.table_hdr.sectionViewportPosition(self.table_hdr.logicalIndex(col_num))
+        y_pos = header_y + self.table_hdr.geometry().y() + self.table_hdr.height()
         max_x = header_x + self.table_view.width()
         if x_pos + filt_width > max_x:
             x_pos = max_x - filt_width
@@ -810,17 +826,19 @@ class SmartTable(QtWidgets.QWidget):
             self.filter_dialog.btn_hide_col.setVisible(False)
         else:
             self.filter_dialog.btn_hide_col.setVisible(True)
+
+        value_attrs = self.col_value_attrs.get(col_name, smrt_consts.SmartValueAttributes())
         accepted = self.filter_dialog.show_window(
             column_data=filtered_df[col_name],
             column_name=col_name,
             dtype=self.smrt_df.dtypes[col_name],
             current_filter=curr_filter,
             current_sort_order=curr_sort,
-            time_resolution=time_res
+            time_resolution=time_res,
+            value_attrs=value_attrs
         )
         self.logger.debug(f'Accepted? {accepted}')
         if accepted and self.filter_dialog.action_requested == smrt_consts.SmartFilterAction.NEW_FILTER:
-            print(self.filter_dialog.new_filter)
             self.proxy_model.set_filter_for_column(col_name, self.filter_dialog.new_filter)
         elif self.filter_dialog.action_requested == smrt_consts.SmartFilterAction.CLR_FILTER:
             self.proxy_model.set_filter_for_column(col_name, None)
@@ -894,6 +912,18 @@ class SmartTable(QtWidgets.QWidget):
             except pickle.PickleError:
                 self.logger.debug('Pickle error')
         return False
+
+    @QtCore.pyqtSlot(QtCore.QModelIndex)
+    def on_cell_double_clicked(self, idx: QtCore.QModelIndex):
+        # model_idx = self.proxy_model.mapToSource(idx)
+        val = self.proxy_model.data(idx)
+        # val = self.table_model.smrt_df.data_df.iloc[model_idx.row(), model_idx.column()]
+        app = QtGui.QGuiApplication.instance()
+        clipboard = app.clipboard()
+        clipboard.setText(val)
+        # print(model_idx.row(), model_idx.column())
+        # idx = self.proxy_model.mapFromSource(idx)
+        # print(self.table_model.data(idx, role=QtCore.Qt.ItemDataRole.DisplayRole))
 
     @QtCore.pyqtSlot()
     def on_save_view_btn(self):
@@ -1065,7 +1095,6 @@ class SmartTable(QtWidgets.QWidget):
             return
         excel.quit()
         self.flag_excel_available = True
-        self.btn_export_excel.setEnabled(True)
         self.btn_print_export.setEnabled(True)
         return
 

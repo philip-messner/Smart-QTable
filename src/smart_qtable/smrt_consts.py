@@ -1,9 +1,30 @@
+import typing
+
 from PyQt6 import QtGui, QtCore
 
 import datetime
 import enum
+import dataclasses
 
 # common enumerated type classes
+
+class SmartValueFlags(enum.IntFlag):
+
+    NO_FLAG = 0
+    REQUIRED = 1            # date is required. If None will be listed as UNKNOWN
+    MIN_VALID_VALUE = 2      # any date below a specific minimum will be listed as INVALID
+    MAX_VALID_VALUE = 4      # any date above a specific maximum will be listed as INVALID
+    MAX_EXPECTED_VALUE = 8     # any date above a specific maximum will be considered as None (Blank)
+
+
+@dataclasses.dataclass
+class SmartValueAttributes:
+
+    flags: SmartValueFlags = SmartValueFlags.NO_FLAG
+    min_value: typing.Any = None
+    max_value: typing.Any = None
+
+
 class ThreadStatus(enum.IntEnum):
     UNINIT = -999
     STARTING = -1
@@ -172,6 +193,7 @@ CONMED_ATL_NULL = -918273465
 ADV_SORT_NO_SELECT_FLAG = -1234
 ADV_SORT_COL_NAME_VALUE = 9876
 ADV_SORT_SORT_ORD_VALUE = 6789
+SMRT_TBL_BLANK_INT_FLAG = -975312468
 
 # Custom assigned Item Data Roles
 ACTION_STATUS_ROLE = QtCore.Qt.ItemDataRole.UserRole + 11
@@ -215,7 +237,7 @@ SMART_DATA_COL_DTYPES = [SmartDataTypes.OBJECT,
 DF_ACTION_COLUMN = 'Pending Action'
 
 DF_INDEX_NAME = 'Index'
-FILTER_MAX_ROW_LIMIT = 100000
+FILTER_MAX_ROW_LIMIT = 10000
 
 SELECT_ALL_TXT = '(Select All)'
 SELECT_ALL_RESULTS = '(Select All Search Results)'

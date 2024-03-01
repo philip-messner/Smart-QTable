@@ -43,8 +43,7 @@ class SmartProxyModel(QtCore.QSortFilterProxyModel):
             else:
                 filt = model_df[col_name].isin(df_filter)
             self.filter_mask = self.filter_mask & filt
-            for idx, val in model_df[col_name].items():
-                print(val)
+
 
     def set_hidden_cols(self, new_hidden_cols: list[str]) -> None:
         self.hidden_cols.clear()
@@ -66,7 +65,6 @@ class SmartProxyModel(QtCore.QSortFilterProxyModel):
         column_name = self.sourceModel().headerData(section=source_column, orientation=QtCore.Qt.Orientation.Horizontal,
                                                     role=QtCore.Qt.ItemDataRole.DisplayRole)
         if column_name:
-            # print(f'Column name: {column_name} - {column_name not in self.hidden_cols}')
             return column_name not in self.hidden_cols
         return False
 
