@@ -33,7 +33,6 @@ class SmartDataModel(QtCore.QAbstractTableModel):
 
     def drop_df_row(self, df_idx: typing.Any):
         row_num = self.smrt_df.data_df.index.get_loc(df_idx)
-        print(f"Dropping row {row_num}, {df_idx}")
         self.beginRemoveRows(QtCore.QModelIndex(), row_num, row_num)
         self.smrt_df.data_df.drop(df_idx, inplace=True)
         self.endRemoveRows()

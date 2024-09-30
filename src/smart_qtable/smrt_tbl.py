@@ -87,7 +87,7 @@ class SmartTable(QtWidgets.QWidget):
 
         # define/initialize member variables
         self.__smrt_df: smrt_dataframe.SmartDataFrame = smrt_df
-        self.table_name: str = f'Table_{self._table_id}'
+        self.table_name: str = kwargs.get('table_name', None) or f'Table_{self._table_id}'
         self.summary_columns: list[smrt_summary_widget.Attribute] = []
         self.table_flags: smrt_consts.SmartTableFlags = smrt_consts.SmartTableFlags.NO_FLAG
         self.col_value_attrs: dict[str, smrt_consts.SmartValueAttributes] = kwargs.get('col_value_attrs', None) or {}
@@ -122,9 +122,9 @@ class SmartTable(QtWidgets.QWidget):
         self.set_table_mode(kwargs.get('table_mode', smrt_consts.SmartTableMode.DATA_MODE))
         self._init_table_actions()
 
-        self.table_name = kwargs.get('table_name', f'Table_{self._table_id}')
+        # self.table_name = kwargs.get('table_name', f'Table_{self._table_id}')
 
-        self.default_view: smrt_tbl_view.SmartTableView = smrt_tbl_view.SmartTableView(
+        self.default_view: smrt_tbl_view.SmartTableView = kwargs.get('default_view', None) or smrt_tbl_view.SmartTableView(
             'Default',
             [],
             list(self.smrt_df.dtypes.keys())
@@ -166,7 +166,6 @@ class SmartTable(QtWidgets.QWidget):
         self.proxy_model.setSourceModel(self.table_model)
         self.proxy_model.on_model_reset()
         self.table_view.setModel(self.proxy_model)
-
 
         sum_record_count = kwargs.get('sum_record_count', True)
         if sum_record_count:
@@ -218,6 +217,8 @@ class SmartTable(QtWidgets.QWidget):
         self.table_model.rowsRemoved.connect(self.update_summary_selected)
         self.table_model.rowsRemoved.connect(self.update_filter_totals)
 
+        self.set_current_view(self.default_view)
+
     @property
     def refresh_dt(self) -> datetime.datetime:
         return self.__smrt_df.refresh_dt
@@ -245,6 +246,7 @@ class SmartTable(QtWidgets.QWidget):
         self.proxy_model.on_model_reset()
         self.proxy_model.endResetModel()
         self.refresh_dt = new_smrt_df.refresh_dt
+        self.set_current_view(self.current_view)
         self.update_summary_totals()
 
     def start_refresh_btn_animation(self):
@@ -276,7 +278,6 @@ class SmartTable(QtWidgets.QWidget):
     def set_table_mode(self, mode: smrt_consts.SmartTableMode):
         if self.table_mode == mode:
             return
-
         if mode == smrt_consts.SmartTableMode.ACTION_MODE:
             self.frm_data_refresh.setVisible(False)
 
@@ -304,6 +305,7 @@ class SmartTable(QtWidgets.QWidget):
 
             self.table_hdr.setSectionsMovable(True)
             self._init_default_toolbar()
+        self.table_mode = mode
 
     def add_action_to_alt_toolbar(self, new_action: QtGui.QAction):
         if not new_action:
@@ -457,10 +459,13 @@ class SmartTable(QtWidgets.QWidget):
                 self.summary_widget.update_attr_filtered(col.name, 0)
             else:
                 col_num = self.current_view.col_order.index(col.name)
+                self.logger.info(f'Column name {col.name}: column num: {col_num}')
                 tot_val = 0
                 for row_num in range(self.proxy_model.rowCount()):
-                    mod_idx = self.proxy_model.index(row_num, col_num)
-                    val = self.proxy_model.data(mod_idx, QtCore.Qt.ItemDataRole.EditRole)
+                    df_row = self.proxy_model.mapToSource(self.proxy_model.index(row_num, 0)).row()
+                    df_idx = self.smrt_df.data_df.iloc[df_row].name
+                    val = self.smrt_df.data_df.loc[df_idx, col.name]
+                    self.logger.info(f'Row: {row_num}, Col Name: {col.name}, Value: {val} {type(val)}')
                     if pd.isnull(val):
                         val = 0
                     tot_val += val
@@ -559,33 +564,32 @@ class SmartTable(QtWidgets.QWidget):
         self.set_current_view(selected_view)
 
     def set_current_view(self, new_view: smrt_tbl_view.SmartTableView):
-        if new_view == self.current_view:
-            return
 
-        # check to see if the new view is the same as any other saved view. If so, set that as the current view, else mark as custom...
-        self.flag_respond_to_view_cmb = False
-        view_found = False
-        for view_name, view_obj in self.view_dict.items():
-            if new_view == view_obj:
-                self.cbo_view_select.setCurrentText(view_name)
-                view_found = True
-                new_view = view_obj
+        if self.table_mode == smrt_consts.SmartTableMode.DATA_MODE:
+            # check to see if the new view is the same as any other saved view. If so, set that as the current view, else mark as custom...
+            self.flag_respond_to_view_cmb = False
+            view_found = False
+            for view_name, view_obj in self.view_dict.items():
+                if new_view == view_obj:
+                    self.cbo_view_select.setCurrentText(view_name)
+                    view_found = True
+                    new_view = view_obj
+                    idx = self.cbo_view_select.findText(smrt_consts.CUSTOM_VIEW_NAME)
+                    if idx != -1:
+                        self.cbo_view_select.removeItem(idx)
+                    self.btn_save_view.setEnabled(False)
+                    break
+
+            if not view_found:
+                new_view.name = smrt_consts.CUSTOM_VIEW_NAME
                 idx = self.cbo_view_select.findText(smrt_consts.CUSTOM_VIEW_NAME)
-                if idx != -1:
-                    self.cbo_view_select.removeItem(idx)
-                self.btn_save_view.setEnabled(False)
-                break
-
-        if not view_found:
-            new_view.name = smrt_consts.CUSTOM_VIEW_NAME
-            idx = self.cbo_view_select.findText(smrt_consts.CUSTOM_VIEW_NAME)
-            if idx == -1:
-                self.cbo_view_select.addItem(new_view.name, new_view)
-                self.cbo_view_select.setCurrentText(new_view.name)
-                self.btn_save_view.setEnabled(True)
-            else:
-                self.cbo_view_select.setItemData(idx, new_view)
-        self.flag_respond_to_view_cmb = True
+                if idx == -1:
+                    self.cbo_view_select.addItem(new_view.name, new_view)
+                    self.cbo_view_select.setCurrentText(new_view.name)
+                    self.btn_save_view.setEnabled(True)
+                else:
+                    self.cbo_view_select.setItemData(idx, new_view)
+            self.flag_respond_to_view_cmb = True
 
         self.proxy_model.set_hidden_cols(new_view.hidden_cols)
         self.current_view = new_view
@@ -921,9 +925,6 @@ class SmartTable(QtWidgets.QWidget):
         app = QtGui.QGuiApplication.instance()
         clipboard = app.clipboard()
         clipboard.setText(val)
-        # print(model_idx.row(), model_idx.column())
-        # idx = self.proxy_model.mapFromSource(idx)
-        # print(self.table_model.data(idx, role=QtCore.Qt.ItemDataRole.DisplayRole))
 
     @QtCore.pyqtSlot()
     def on_save_view_btn(self):
