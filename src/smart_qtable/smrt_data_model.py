@@ -141,7 +141,7 @@ class SmartDataModel(QtCore.QAbstractTableModel):
                 else:
                     return "FALSE"
             else:
-                self.logger.info(
+                self.logger.debug(
                     "An unknown dtype was coverted to a string (by default)"
                 )
                 if pd.isnull(value):
@@ -170,7 +170,7 @@ class SmartDataModel(QtCore.QAbstractTableModel):
                 else:
                     return 0
             else:
-                self.logger.info(
+                self.logger.debug(
                     "An unknown dtype was coverted to a string (by default)"
                 )
                 return str(value)
@@ -196,7 +196,7 @@ class SmartDataModel(QtCore.QAbstractTableModel):
                 else:
                     return 0
             else:
-                self.logger.info(
+                self.logger.debug(
                     "An unknown dtype was coverted to a string (by default)"
                 )
                 return str(value)

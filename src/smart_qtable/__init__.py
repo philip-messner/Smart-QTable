@@ -16,4 +16,4 @@ except PackageNotFoundError:  # pragma: no cover
 finally:
     del version, PackageNotFoundError
 
-dotenv.load_dotenv()
+# dotenv.load_dotenv()

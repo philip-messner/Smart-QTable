@@ -24,4 +24,5 @@ class SmartDataFrame:
                 raise ValueError('The dataframe columns and dtype key columns must match exactly.')
             for column in self.dtypes.keys():
                 if column not in self.data_df.columns:
+                    print('column: ', column, ' not in data_df')
                     raise ValueError('The dataframe columns and dtype key columns must match exactly.')

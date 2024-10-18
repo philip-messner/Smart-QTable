@@ -79,6 +79,11 @@ class SmartTable(QtWidgets.QWidget):
                 sum_record_count: (bool) flag to indicate whether to summarize the total number of records in the table.
                     This counts as 1 of the 3 max summary columns for the table. (default = True)
         """
+
+        usr_data_path = os.getenv('USR_DATA_PATH')
+        if not usr_data_path:
+            raise KeyError('It is required to have \'USR_DATA_PATH\' environment variable set in order to use this SmartTable object.')
+
         parent = kwargs.get('parent', None)
         super().__init__(parent=parent)
         self._setup_table_ui()
@@ -459,13 +464,11 @@ class SmartTable(QtWidgets.QWidget):
                 self.summary_widget.update_attr_filtered(col.name, 0)
             else:
                 col_num = self.current_view.col_order.index(col.name)
-                self.logger.info(f'Column name {col.name}: column num: {col_num}')
                 tot_val = 0
                 for row_num in range(self.proxy_model.rowCount()):
                     df_row = self.proxy_model.mapToSource(self.proxy_model.index(row_num, 0)).row()
                     df_idx = self.smrt_df.data_df.iloc[df_row].name
                     val = self.smrt_df.data_df.loc[df_idx, col.name]
-                    self.logger.info(f'Row: {row_num}, Col Name: {col.name}, Value: {val} {type(val)}')
                     if pd.isnull(val):
                         val = 0
                     tot_val += val
@@ -507,24 +510,26 @@ class SmartTable(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def draw_column_icons(self):
+        adjustment: int = 0
         for logical_idx, col_name in enumerate(self.smrt_df.data_df.columns):
             if col_name in self.current_view.hidden_cols:
-                return
+                adjustment += 1
+                continue
 
             if col_name in self.proxy_model.table_filters and col_name in self.proxy_model.table_sort_order:
                 if self.proxy_model.table_sort_order[col_name] == QtCore.Qt.SortOrder.AscendingOrder:
-                    self.table_hdr.set_column_icon(logical_idx, smrt_consts.HdrBtnIcons.FILTER_SORT_ASCENDING)
+                    self.table_hdr.set_column_icon(logical_idx - adjustment, smrt_consts.HdrBtnIcons.FILTER_SORT_ASCENDING)
                 else:
-                    self.table_hdr.set_column_icon(logical_idx, smrt_consts.HdrBtnIcons.FILTER_SORT_DESCENDING)
+                    self.table_hdr.set_column_icon(logical_idx - adjustment, smrt_consts.HdrBtnIcons.FILTER_SORT_DESCENDING)
             elif col_name in self.proxy_model.table_filters:
-                self.table_hdr.set_column_icon(logical_idx, smrt_consts.HdrBtnIcons.FILTER)
+                self.table_hdr.set_column_icon(logical_idx - adjustment, smrt_consts.HdrBtnIcons.FILTER)
             elif col_name in self.proxy_model.table_sort_order:
                 if self.proxy_model.table_sort_order[col_name] == QtCore.Qt.SortOrder.AscendingOrder:
-                    self.table_hdr.set_column_icon(logical_idx, smrt_consts.HdrBtnIcons.SORT_ASCENDING)
+                    self.table_hdr.set_column_icon(logical_idx - adjustment, smrt_consts.HdrBtnIcons.SORT_ASCENDING)
                 else:
-                    self.table_hdr.set_column_icon(logical_idx, smrt_consts.HdrBtnIcons.SORT_DESCENDING)
+                    self.table_hdr.set_column_icon(logical_idx - adjustment, smrt_consts.HdrBtnIcons.SORT_DESCENDING)
             else:
-                self.table_hdr.set_column_icon(logical_idx, smrt_consts.HdrBtnIcons.DEFAULT)
+                self.table_hdr.set_column_icon(logical_idx - adjustment, smrt_consts.HdrBtnIcons.DEFAULT)
 
     def set_item_delegates(self):
         for idx, col_name in enumerate(self.current_view.col_order):
@@ -643,7 +648,7 @@ class SmartTable(QtWidgets.QWidget):
             export_df = export_df.replace(smrt_consts.INVALID_DATE, 'INVALID')
 
             # export table data to excel
-        data_folder = SmartTable.get_default_app_data_path()
+        data_folder = pathlib.Path(os.getenv('USR_DATA_PATH'))
         temp_file = pathlib.Path.joinpath(data_folder, 'temp.xlsx')
         export_df.to_excel(
             temp_file,
@@ -893,8 +898,8 @@ class SmartTable(QtWidgets.QWidget):
             self.cbo_view_select.addItem(v_name, v_obj)
         
     def _load_view_dict_from_file(self) -> dict[str, smrt_tbl_view.SmartTableView]:
-        user_data_folder = SmartTable.get_default_app_data_path()
-        table_pickle = pathlib.Path.joinpath(user_data_folder, self.table_name + '.pkl')
+        user_data_folder = pathlib.Path(os.getenv('USR_DATA_PATH'))
+        table_pickle = pathlib.Path.joinpath(user_data_folder, self.table_name + '_table_views.pkl')
         if table_pickle.is_file():
             with open(table_pickle, 'rb') as f:
                 try:
@@ -904,7 +909,7 @@ class SmartTable(QtWidgets.QWidget):
         return {}
 
     def _save_view_dict_to_file(self) -> bool:
-        user_data_folder = SmartTable.get_default_app_data_path()
+        user_data_folder = pathlib.Path(os.getenv('USR_DATA_PATH'))
         success = False
         table_pickle = pathlib.Path.joinpath(user_data_folder, self.table_name + '.pkl')
         dict_without_default = self.view_dict.copy()

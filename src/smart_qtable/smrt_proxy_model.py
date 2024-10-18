@@ -111,10 +111,12 @@ class SmartProxyModel(QtCore.QSortFilterProxyModel):
         if not self.table_sort_order:
             self.sort(-1)
             return
+        adjusted_columns = [col_name for col_name in model_df.columns if col_name not in self.hidden_cols]
         for cn, so in reversed(self.table_sort_order.items()):
-            if cn not in model_df.columns:
+            if cn not in adjusted_columns:
                 continue
-            self.sort(list(model_df.columns).index(cn), so)
+            self.sort(adjusted_columns.index(cn), so)
+
 
     def clear_sort(self, **kwargs) -> None:
         apply_sort = kwargs.get('apply_sort', True)
