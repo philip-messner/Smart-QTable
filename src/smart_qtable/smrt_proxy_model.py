@@ -21,7 +21,19 @@ class SmartProxyModel(QtCore.QSortFilterProxyModel):
         self.table_filters: dict[str, list[typing.Any]] = {}
         self.hidden_cols: list[str] = []
         self.filter_mask: pd.Series = None
+        self.setSortRole(smrt_consts.TABLE_SORT_ROLE)
 
+
+    def lessThan(self, left_idx: QtCore.QModelIndex, right_idx: QtCore.QModelIndex) -> bool:
+        left_sort_value = self.sourceModel().data(left_idx, smrt_consts.TABLE_SORT_ROLE)
+        right_sort_value = self.sourceModel().data(right_idx, smrt_consts.TABLE_SORT_ROLE)
+        # if pd.isnull(left_sort_value) and pd.isnull(right_sort_value):
+        #     return False
+        # if pd.isnull(left_sort_value):
+        #     return True
+        # if pd.isnull(right_sort_value):
+        #     return False
+        return left_sort_value < right_sort_value
 
     def on_model_reset(self):
         self.create_filter_mask()
