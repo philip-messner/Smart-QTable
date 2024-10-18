@@ -169,6 +169,8 @@ class SmartDataModel(QtCore.QAbstractTableModel):
                     return 1
                 else:
                     return 0
+            elif dtype == smrt_consts.SmartDataTypes.LOCATION:
+                return value
             else:
                 self.logger.debug(
                     "An unknown dtype was coverted to a string (by default)"

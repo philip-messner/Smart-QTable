@@ -54,6 +54,7 @@ class SmartDataTypes(enum.IntEnum):
     OBJECT = 6
     BOOL = 7
     STATUS = 8
+    LOCATION = 9
 
 
 class SmartTableMode(enum.IntEnum):
